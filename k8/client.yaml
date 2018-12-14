@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fibonacci-client
+  labels:
+    app: fibonacci-client
+spec:
+  ports:
+  - port: 8081
+    targetPort: 8081
+  selector:
+    app: fibonacci-client
+  type: NodePort
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fibonacci-client
+spec:
+  selector:
+    matchLabels:
+      app: fibonacci-client
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fibonacci-client
+    spec:
+      containers:
+      - name: fibonacci-client
+        image: deciphernow/fibonacci:client-latest
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "500m"
+          limits:
+            cpu: "1000m"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: HOST
+          value: "fibonacci.$(POD_NAMESPACE)"
+        - name: PORT
+          value: "8081"
+      imagePullSecrets:
+        - name: dockerhubcred

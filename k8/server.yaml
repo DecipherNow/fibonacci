@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fibonacci
+  labels:
+    app: fibonacci
+spec:
+  ports:
+  - port: 8081
+    targetPort: 8081
+  selector:
+    app: fibonacci
+  type: NodePort
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fibonacci
+spec:
+  selector:
+    matchLabels:
+      app: fibonacci
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fibonacci
+    spec:
+      containers:
+      - name: fibonacci
+        image: deciphernow/fibonacci:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "500m"
+          limits:
+            cpu: "1000m"
+      - name: sidecar
+        image: deciphernow/gm-proxy:latest
+        ports:
+        - name: http-port
+          containerPort: 8081
+        - name: https-port
+          containerPort: 8443
+        - containerPort: 9080
+        resources:
+          requests:
+            cpu: ".5m"
+            memory: ".5Gi"
+          limits:
+            cpu: "1m"
+            memory: ".5Gi"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: ZK_ADDRS
+          value: "zk.$(POD_NAMESPACE):2181"
+        - name: METRICS_PORT
+          value: "9080"
+        - name: ZK_ANNOUNCE_PATH
+          value: "/services/fibonacci/1.0"
+        - name: SERVICE_HOST
+          value: "127.0.0.1"
+        - name: SERVICE_PORT
+          value: "8080"
+        - name: PORT
+          value: "8081"
+      imagePullSecrets:
+        - name: dockerhubcred

@@ -1,0 +1,134 @@
+version: 2
+
+defaults: &defaults
+  working_directory: /go/src/github.com/deciphernow/fibonacci
+  docker:
+    - image: golang:1.11-alpine
+
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: apk update && apk add --no-cache ca-certificates
+      - run: go build
+
+  release:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Install Docker Ubuntu
+          command: |
+            apt-get update
+            apt-get install -y apt-transport-https ca-certificates curl software-properties-common cmake automake wget
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+            add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            apt-get update -y && apt-get -y install docker-ce
+      - attach_workspace:
+          at: .
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run:
+          name: Build and push latest
+          command: |
+            docker build -f Dockerfile -t deciphernow/fibonacci:latest .
+            docker push deciphernow/fibonacci:latest
+      - run: wget https://github.com/DecipherNow/releaser/releases/download/0.2.1/releaser
+      - run: chmod +x releaser
+      - run:
+          name: Run Tagging
+          command: |
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+            source VERSION
+            ./releaser docker --symver $VERSION --image deciphernow/fibonacci:latest --username $DOCKER_USER --password $DOCKER_PASS
+            ./releaser github --symver $VERSION --token $GITHUB_TOKEN --organization deciphernow --asset ./fibonacci
+            
+  release-client:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Install Docker Ubuntu
+          command: |
+            apt-get update
+            apt-get install -y apt-transport-https ca-certificates curl software-properties-common cmake automake wget
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+            add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            apt-get update -y && apt-get -y install docker-ce
+      - attach_workspace:
+          at: .
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run:
+          name: Build and push latest
+          command: |
+            docker build -f client/Dockerfile -t deciphernow/fibonacci:client-latest ./client/
+            docker push deciphernow/fibonacci:client-latest
+      - run: wget https://github.com/DecipherNow/releaser/releases/download/0.2.1/releaser
+      - run: chmod +x releaser
+      - run:
+          name: Run Tagging
+          command: |
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+            source VERSION
+            ./releaser docker --symver $VERSION --image deciphernow/fibonacci:client-latest --username $DOCKER_USER --password $DOCKER_PASS
+
+  push-to-demo:
+    working_directory: /go/src/github.com/deciphernow/fibonacci
+    docker:
+      - image: deciphernow/oc-client
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: oc login $OC_HOST --insecure-skip-tls-verify=true -p $OS_PASSWORD -u $OC_USER
+      - run: oc replace --force -f ./k8/server.yaml --namespace $OC_NAMESPACE      
+      - run: oc replace --force -f ./k8/client.yaml --namespace $OC_NAMESPACE
+
+
+workflows:
+  version: 2
+  build-and-release:
+    jobs:
+      - build:
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: /.*/
+      - test:
+          requires:
+            - build
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: /.*/
+      - release:
+          requires:
+            - build
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: master
+      - release-client:
+          requires:
+            - build
+            - test
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: master
+    demo:
+      jobs:
+        - push-to-demo:
+          requires:
+            - build
+            - release
+            filters:
+              tags:
+                ignore: /.*/
+              branches:
+                only: /.*/
