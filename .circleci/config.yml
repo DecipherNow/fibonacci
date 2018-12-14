@@ -121,14 +121,12 @@ workflows:
               ignore: /.*/
             branches:
               only: master
-    demo:
-      jobs:
-        - push-to-demo:
+      - push-to-demo:
           requires:
             - build
             - release
-            filters:
-              tags:
-                ignore: /.*/
-              branches:
-                only: /.*/
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: /.*/
