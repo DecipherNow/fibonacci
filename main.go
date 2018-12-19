@@ -15,6 +15,7 @@ import (
 
 // Recursive fib function
 func fib_recurse(val int) (int, error) {
+	
 	if val < 0 {
 		err := fmt.Errorf("cannot calculate sequence on negative value: %d", val)
 		return 0, err
@@ -35,7 +36,7 @@ func fib_recurse(val int) (int, error) {
 
 	val1, _ := fib_recurse(val - 1)
 	val2, _ := fib_recurse(val - 2)
-	return val1 + val2, nil
+	return val1 + val2, nil	
 }
 
 func main() {
