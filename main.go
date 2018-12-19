@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Recursive fib function
 func fib_recurse(val int) (int, error) {
 	if val < 0 {
 		err := fmt.Errorf("cannot calculate sequence on negative value: %d", val)
