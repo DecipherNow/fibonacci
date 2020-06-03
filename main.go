@@ -76,7 +76,7 @@ func main() {
 		}
 
 		ret, _ := fib_recurse(val)
-		fmt.Println("Fibonacci recursively for %d", val)
+		fmt.Printf("Fibonacci recursively for %d: %d", val, ret)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(fmt.Sprintf("%d\n", ret)))
 	})
